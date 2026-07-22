@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  formula:
+    runs-on: macos-latest
+    env:
+      HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tap this checkout
+        run: brew tap Iliorn/tap "file://$GITHUB_WORKSPACE"
+
+      - name: Style and audit
+        run: |
+          brew style Iliorn/tap/taskr
+          brew audit --strict --new --online Iliorn/tap/taskr
+
+      - name: Build, install, and test
+        run: |
+          brew install --build-from-source Iliorn/tap/taskr
+          brew test Iliorn/tap/taskr
