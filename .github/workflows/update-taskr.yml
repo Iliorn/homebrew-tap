@@ -13,8 +13,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  formula:
+  check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.change.outputs.changed }}
+      sha256: ${{ steps.source.outputs.sha256 }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
 
@@ -39,10 +45,37 @@ jobs:
             --output taskr-source.tar.gz
           echo "sha256=$(sha256sum taskr-source.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      - name: Update formula
+      - name: Check whether the formula changed
+        id: change
         env:
           TAG: ${{ steps.release.outputs.tag }}
           SOURCE_SHA256: ${{ steps.source.outputs.sha256 }}
+        run: |
+          url="https://github.com/Iliorn/taskr/archive/refs/tags/${TAG}.tar.gz"
+          if grep -Fqx "  url \"${url}\"" Formula/taskr.rb && \
+             grep -Fqx "  sha256 \"${SOURCE_SHA256}\"" Formula/taskr.rb; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  formula:
+    needs: check
+    if: needs.check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    env:
+      HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Update formula
+        env:
+          TAG: ${{ needs.check.outputs.tag }}
+          SOURCE_SHA256: ${{ needs.check.outputs.sha256 }}
         run: |
           ruby - "$TAG" "$SOURCE_SHA256" <<'RUBY'
           tag, sha256 = ARGV
@@ -54,16 +87,37 @@ jobs:
           File.write(path, formula)
           RUBY
 
-      - name: Publish formula update
+      - name: Commit formula update
+        id: commit
         env:
-          TAG: ${{ steps.release.outputs.tag }}
+          TAG: ${{ needs.check.outputs.tag }}
         run: |
           if git diff --quiet; then
             echo "Formula already points at ${TAG}"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "Taskr release automation"
           git config user.email "actions@users.noreply.github.com"
           git add Formula/taskr.rb
           git commit -m "taskr ${TAG}"
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Tap this checkout
+        run: brew tap Iliorn/tap "file://$GITHUB_WORKSPACE"
+
+      - name: Style and audit
+        run: |
+          brew style Iliorn/tap/taskr
+          brew audit --strict --new --online Iliorn/tap/taskr
+
+      - name: Build, install, and test
+        run: |
+          brew install --build-from-source Iliorn/tap/taskr
+          brew test Iliorn/tap/taskr
+
+      - name: Publish formula update
+        if: steps.commit.outputs.changed == 'true'
+        run: |
           git push
