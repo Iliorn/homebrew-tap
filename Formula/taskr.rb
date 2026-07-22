@@ -1,8 +1,8 @@
 class Taskr < Formula
   desc "Keyboard-driven terminal task manager with sequencing and sync"
   homepage "https://github.com/Iliorn/taskr"
-  url "https://github.com/Iliorn/taskr/archive/refs/tags/v1.30.0.tar.gz"
-  sha256 "c73e3efd481273d5a14945ce6c8e556dc994c9d7193f613c22e171e1d7107b66"
+  url "https://github.com/Iliorn/taskr/archive/refs/tags/v1.30.1.tar.gz"
+  sha256 "4046149b6fb3f7ed290bc1e62ebf61af0688945ffd056afea31aa8fe7be11e7e"
   license "MIT"
   head "https://github.com/Iliorn/taskr.git", branch: "main"
 
