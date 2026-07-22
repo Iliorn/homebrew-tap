@@ -1,0 +1,69 @@
+name: Update Taskr
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-taskr
+  cancel-in-progress: false
+
+jobs:
+  formula:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Find latest Taskr release
+        id: release
+        run: |
+          tag="$(curl --fail --location --retry 3 --silent --show-error \
+            https://api.github.com/repos/Iliorn/taskr/releases/latest | jq -r .tag_name)"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unexpected release tag: $tag" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate source checksum
+        id: source
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            "https://github.com/Iliorn/taskr/archive/refs/tags/${TAG}.tar.gz" \
+            --output taskr-source.tar.gz
+          echo "sha256=$(sha256sum taskr-source.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Update formula
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          SOURCE_SHA256: ${{ steps.source.outputs.sha256 }}
+        run: |
+          ruby - "$TAG" "$SOURCE_SHA256" <<'RUBY'
+          tag, sha256 = ARGV
+          path = "Formula/taskr.rb"
+          formula = File.read(path)
+          url = "https://github.com/Iliorn/taskr/archive/refs/tags/#{tag}.tar.gz"
+          abort "stable URL not found" unless formula.sub!(/^  url ".*"$/, "  url \"#{url}\"")
+          abort "stable checksum not found" unless formula.sub!(/^  sha256 "[0-9a-f]{64}"$/, "  sha256 \"#{sha256}\"")
+          File.write(path, formula)
+          RUBY
+
+      - name: Publish formula update
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if git diff --quiet; then
+            echo "Formula already points at ${TAG}"
+            exit 0
+          fi
+          git config user.name "Taskr release automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add Formula/taskr.rb
+          git commit -m "taskr ${TAG}"
+          git push
