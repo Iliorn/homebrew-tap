@@ -23,14 +23,16 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Tap this checkout
-        run: brew tap Iliorn/tap "file://$GITHUB_WORKSPACE"
+        run: |
+          brew tap Iliorn/tap "file://$GITHUB_WORKSPACE"
+          brew trust Iliorn/tap
 
       - name: Style and audit
         run: |
-          brew style Iliorn/tap/taskr
-          brew audit --strict --new --online Iliorn/tap/taskr
+          brew style Iliorn/tap/tjek
+          brew audit --strict --new --online Iliorn/tap/tjek
 
       - name: Build, install, and test
         run: |
-          brew install --build-from-source Iliorn/tap/taskr
-          brew test Iliorn/tap/taskr
+          brew install --build-from-source Iliorn/tap/tjek
+          brew test Iliorn/tap/tjek
