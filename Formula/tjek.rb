@@ -1,8 +1,8 @@
 class Tjek < Formula
   desc "Keyboard-driven terminal task manager that tells you what to do next"
   homepage "https://github.com/Iliorn/tjek"
-  url "https://github.com/Iliorn/tjek/archive/refs/tags/v1.59.0.tar.gz"
-  sha256 "c55e24c73c4ba7713b27249cffe171bfa3c2cf7db9dad69fe1eb1583ffeef056"
+  url "https://github.com/Iliorn/tjek/archive/refs/tags/v1.60.0.tar.gz"
+  sha256 "55ea56b71b7ac885f7b0769265bacef6c6390195a1d7d5a8e9d0b2d36982aa41"
   license "MIT"
   head "https://github.com/Iliorn/tjek.git", branch: "main"
 
